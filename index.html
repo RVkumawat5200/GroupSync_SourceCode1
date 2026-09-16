@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroupSync — DBMS Project Recovery & Management Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN for reactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            900: '#312e81',
+                        },
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { opacity: 1, filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' },
+                            '50%': { opacity: 0.7, filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.2))' }
+                        },
+                        fadeInUp: {
+                            '0%': { opacity: 0, transform: 'translateY(20px)' },
+                            '100%': { opacity: 1, transform: 'translateY(0)' }
+                        },
+                        fadeIn: {
+                            '0%': { opacity: 0 },
+                            '100%': { opacity: 1 }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #050505;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 40%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 40%),
+                radial-gradient(at 50% 50%, rgba(239, 68, 68, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-card-interactive {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card-interactive:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4), 0 10px 20px -10px rgba(99, 102, 241, 0.2);
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        /* 3D Animated Logo Area */
+        .logo-container {
+            perspective: 1000px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-style: preserve-3d;
+        }
+
+        .logo-core {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #10b981;
+            border-radius: 4px;
+            transform: translateZ(20px);
+            box-shadow: 0 0 20px #10b981;
+            transition: all 0.5s ease;
+        }
+
+        .logo-ring-1,
+        .logo-ring-2 {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            transition: all 0.5s ease;
+        }
+
+        .logo-ring-1 {
+            width: 36px;
+            height: 36px;
+            transform: translateZ(10px) rotate(45deg);
+        }
+
+        .logo-ring-2 {
+            width: 48px;
+            height: 48px;
+            transform: translateZ(0px) rotate(15deg);
+            border-color: rgba(14, 165, 233, 0.4);
+        }
+
+        .logo-container:hover .logo-core {
+            transform: translateZ(30px) rotate(90deg);
+            box-shadow: 0 0 30px #0ea5e9;
+            background: #0ea5e9;
+        }
+
+        .logo-container:hover .logo-ring-1 {
+            transform: translateZ(15px) rotate(0deg);
+            border-color: rgba(16, 185, 129, 0.8);
+        }
+
+        .logo-container:hover .logo-ring-2 {
+            transform: translateZ(-5px) rotate(90deg);
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .task-card-enter {
+            animation: fadeInUp 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body class="text-slate-200 font-sans min-h-screen antialiased flex flex-col justify-between selection:bg-indigo-500/30"
+    x-data="dashboardApp()">
+
+    <!-- Top Navigation / Header -->
+    <header
+        class="sticky top-0 z-40 w-full border-b border-slate-800/60 bg-slate-950/70 backdrop-blur-xl animate-fade-in">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <!-- Brand / Logo -->
+                <div class="flex items-center gap-4 cursor-pointer group">
+                    <div class="logo-container animate-float">
+                        <div class="logo-ring-2"></div>
+                        <div class="logo-ring-1"></div>
+                        <div class="logo-core"></div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1
+                                class="font-extrabold text-lg md:text-xl text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                                GroupSync</h1>
+                            <span
+                                class="text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]">LATE
+                                SUBMISSION</span>
+                        </div>
+                        <p class="text-[10px] md:text-xs text-slate-400 font-medium">CS-302 DBMS Project • Team Sync
+                            Engine</p>
+                    </div>
+                </div>
+
+                <!-- Center Status & Countdown -->
+                <div
+                    class="hidden lg:flex items-center gap-6 glass-card px-5 py-2 rounded-full border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                    <div class="flex items-center gap-2.5">
+                        <span class="relative flex h-3 w-3">
+                            <span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                        <span class="text-xs font-semibold text-slate-200">Grace Extension Active</span>
+                    </div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div
+                        class="flex items-center gap-2 font-mono text-xs text-amber-400 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                        <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                        <span>RE-SUBMISSION DEADLINE:</span>
+                        <span x-text="countdown" class="text-white">04h 18m 32s</span>
+                    </div>
+                </div>
+
+                <!-- Quick Actions & Profile -->
+                <div class="flex items-center gap-4">
+                    <button @click="openNewTaskModal()"
+                        class="hidden md:flex group items-center gap-2 bg-white text-slate-900 hover:bg-indigo-50 text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(99,102,241,0.4)] active:scale-95">
+                        <i data-lucide="plus" class="w-4 h-4 transition-transform group-hover:rotate-90"></i>
+                        <span class="hidden sm:inline">New Milestone</span>
+                    </button>
+                    <div class="h-8 w-px bg-slate-800 hidden md:block"></div>
+
+                    <!-- Account Dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.away="open = false"
+                            class="w-9 h-9 rounded-full bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-600 flex items-center justify-center font-bold text-xs text-white shadow-inner cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all focus:outline-none">
+                            RK
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div x-show="open" x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                            x-cloak
+                            class="absolute right-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] py-1.5 z-50">
+                            <div class="px-4 py-2 border-b border-slate-800 mb-1">
+                                <p class="text-xs text-slate-400">Signed in as</p>
+                                <p class="text-sm font-bold text-white truncate">Ravi Kumawat</p>
+                            </div>
+                            <a href="#"
+                                class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                                <i data-lucide="user" class="w-4 h-4"></i> Profile Settings
+                            </a>
+                            <a href="#"
+                                class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                                <i data-lucide="users" class="w-4 h-4"></i> Team Management
+                            </a>
+                            <div class="border-t border-slate-800 my-1"></div>
+                            <a href="#"
+                                class="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-800 hover:text-red-300 transition-colors">
+                                <i data-lucide="log-out" class="w-4 h-4"></i> Sign out
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Menu Button -->
+                    <button class="lg:hidden p-2 text-slate-400 hover:text-white focus:outline-none"
+                        @click="mobileMenuOpen = !mobileMenuOpen">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Navigation Panel -->
+            <div x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-4"
+                x-cloak
+                class="lg:hidden bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/50 absolute w-full left-0 top-16 md:top-20 z-30 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+                <div class="px-4 py-4 space-y-4">
+                    <button @click="openNewTaskModal(); mobileMenuOpen = false"
+                        class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-3 rounded-xl transition-all shadow-md active:scale-95">
+                        <i data-lucide="plus" class="w-4 h-4"></i> New Milestone
+                    </button>
+                    <div
+                        class="bg-slate-800/50 px-4 py-3 rounded-xl flex justify-between items-center border border-slate-700/50">
+                        <span class="text-xs font-semibold text-slate-300">Grace Extension Active</span>
+                        <span x-text="countdown" class="text-sm font-mono font-bold text-amber-400"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Urgent Banner Alert -->
+    <div x-show="showAlertBanner" x-transition.opacity.duration.300ms
+        class="bg-gradient-to-r from-red-950/80 via-red-900/40 to-slate-900/80 border-b border-red-500/30 px-4 py-3 backdrop-blur-md animate-fade-in">
+        <div
+            class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-3 text-red-200">
+                <div class="p-1.5 bg-red-500/20 rounded-lg">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-red-400 flex-shrink-0 animate-pulse-glow"></i>
+                </div>
+                <span class="leading-relaxed"><strong class="font-bold text-white tracking-wide">Critical
+                        Alert:</strong> Initial submission rejected due to broken Schema Normalization & missing
+                    ER-Diagram. Extended penalty window (-10%/24h) in effect.</span>
+            </div>
+            <div class="flex items-center gap-4 w-full sm:w-auto justify-end">
+                <a href="#alarm-panel"
+                    class="text-red-300 underline font-semibold hover:text-white transition-colors bg-red-500/10 px-3 py-1 rounded-md border border-red-500/20">View
+                    Breakdown</a>
+                <button @click="showAlertBanner = false"
+                    class="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10 flex-1 w-full">
+
+        <!-- Stat Tiles Header -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <!-- Stat 1 -->
+            <div class="glass-card glass-card-interactive p-6 rounded-3xl relative overflow-hidden animate-fade-in-up"
+                style="animation-delay: 0.1s;">
+                <div class="absolute -right-6 -top-6 w-32 h-32 bg-red-500/10 rounded-full blur-2xl pointer-events-none">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Failure Risk</span>
+                    <span
+                        class="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-3xl font-black text-white tracking-tight">68%</h2>
+                    <span class="text-xs font-bold text-red-400 flex items-center bg-red-500/10 px-2 py-0.5 rounded-md">
+                        <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i> High
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-medium">Driven by 3 blocked migrations</p>
+                <div class="w-full bg-slate-800/50 h-2 rounded-full mt-4 overflow-hidden border border-slate-700/50">
+                    <div class="bg-gradient-to-r from-amber-500 to-red-500 h-full rounded-full relative"
+                        style="width: 68%">
+                        <div class="absolute inset-0 bg-white/20 w-full h-full animate-[pulse_2s_ease-in-out_infinite]">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stat 2 -->
+            <div class="glass-card glass-card-interactive p-6 rounded-3xl relative overflow-hidden animate-fade-in-up"
+                style="animation-delay: 0.2s;">
+                <div
+                    class="absolute -right-6 -top-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Git Activity</span>
+                    <span
+                        class="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                        <i data-lucide="git-commit" class="w-4 h-4"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-3xl font-black text-white tracking-tight">14</h2>
+                    <span
+                        class="text-xs font-bold text-emerald-400 flex items-center bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                        <i data-lucide="arrow-up-right" class="w-3 h-3 mr-1"></i> +40%
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-medium">Last push 18m ago by @rahul_dev</p>
+                <div class="w-full bg-slate-800/50 h-2 rounded-full mt-4 overflow-hidden border border-slate-700/50">
+                    <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" style="width: 82%">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stat 3 -->
+            <div class="glass-card glass-card-interactive p-6 rounded-3xl relative overflow-hidden animate-fade-in-up"
+                style="animation-delay: 0.3s;">
+                <div
+                    class="absolute -right-6 -top-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Velocity</span>
+                    <span
+                        class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-3xl font-black text-white tracking-tight">4.2<span
+                            class="text-lg text-slate-400 font-semibold ml-1">/hr</span></h2>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-medium">Sufficient to meet deadline</p>
+                <div class="w-full bg-slate-800/50 h-2 rounded-full mt-4 overflow-hidden border border-slate-700/50">
+                    <div class="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full"
+                        style="width: 75%"></div>
+                </div>
+            </div>
+
+            <!-- Stat 4 -->
+            <div class="glass-card glass-card-interactive p-6 rounded-3xl relative overflow-hidden animate-fade-in-up"
+                style="animation-delay: 0.4s;">
+                <div
+                    class="absolute -right-6 -top-6 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Sync Health</span>
+                    <span
+                        class="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                        <i data-lucide="message-square" class="w-4 h-4 text-amber-400"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-3xl font-black text-white tracking-tight">Low</h2>
+                    <span
+                        class="text-xs font-bold text-amber-400 flex items-center bg-amber-500/10 px-2 py-0.5 rounded-md">Gap
+                        > 6h</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-medium">1 member unreachable (9 AM)</p>
+                <div class="w-full bg-slate-800/50 h-2 rounded-full mt-4 overflow-hidden border border-slate-700/50">
+                    <div class="bg-gradient-to-r from-red-500 to-amber-500 h-full rounded-full" style="width: 35%">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Task Board / Milestone Tracker -->
+        <section class="space-y-6 animate-fade-in-up" style="animation-delay: 0.5s;">
+            <!-- Controls Bar -->
+            <div
+                class="glass-card p-4 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                    <h3 class="text-xl font-extrabold text-white tracking-tight">Milestone Board</h3>
+                    <p class="text-xs text-slate-400 mt-1 font-medium">Track, assign, and manage critical deliverables
+                    </p>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                    <!-- Search Bar -->
+                    <div class="relative w-full sm:w-64">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                        </div>
+                        <input type="text" x-model="searchQuery" placeholder="Search tasks..."
+                            class="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner">
+                    </div>
+
+                    <!-- Filter Pills -->
+                    <div
+                        class="flex items-center gap-1.5 bg-slate-900/50 p-1.5 rounded-xl border border-slate-700/50 w-full sm:w-auto overflow-x-auto hide-scrollbar">
+                        <button @click="filter = 'all'"
+                            :class="filter === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
+                            class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">All
+                            Tasks</button>
+                        <button @click="filter = 'critical'"
+                            :class="filter === 'critical' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
+                            class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">Critical</button>
+                        <button @click="filter = 'mine'"
+                            :class="filter === 'mine' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
+                            class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">My
+                            Tasks</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Board Columns -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <!-- Column: Critical -->
+                <div
+                    class="glass-card rounded-3xl flex flex-col border-t-4 border-t-red-500 shadow-[0_8px_30px_rgba(239,68,68,0.05)] h-[600px] flex flex-col">
+                    <div
+                        class="p-5 border-b border-slate-800/50 bg-slate-900/20 flex items-center justify-between rounded-t-3xl">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                                <i data-lucide="alert-circle" class="w-4 h-4 text-red-400"></i>
+                            </div>
+                            <h4 class="font-extrabold text-sm text-slate-100">Critical / Blocked</h4>
+                        </div>
+                        <span
+                            class="text-xs font-mono font-bold bg-red-500/10 text-red-400 px-2.5 py-1 rounded-lg border border-red-500/20 shadow-sm"
+                            x-text="filteredTasks('critical').length">0</span>
+                    </div>
+
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1 hide-scrollbar">
+                        <template x-for="task in filteredTasks('critical')" :key="task.id">
+                            <div
+                                class="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-5 hover:border-red-500/50 transition-all duration-300 shadow-md hover:shadow-[0_10px_25px_rgba(239,68,68,0.15)] group relative overflow-hidden task-card-enter">
+                                <!-- Actions Overlay -->
+                                <div
+                                    class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="editTask(task)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-md border border-slate-700 hover:border-indigo-500 transition-colors"
+                                        title="Edit">
+                                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                    <button @click="deleteTask(task.id)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-red-400 rounded-md border border-slate-700 hover:border-red-500 transition-colors"
+                                        title="Delete">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                    <span
+                                        class="text-[10px] font-bold px-2.5 py-1 rounded-md bg-red-500/10 text-red-300 border border-red-500/20 uppercase tracking-wide"
+                                        x-text="task.category"></span>
+                                    <span
+                                        class="text-[10px] text-slate-500 font-mono font-medium bg-slate-800/50 px-2 py-0.5 rounded"
+                                        x-text="task.id"></span>
+                                </div>
+                                <h5 class="text-sm font-bold text-slate-100 group-hover:text-indigo-300 transition-colors pr-10"
+                                    x-text="task.title"></h5>
+                                <p class="text-xs text-slate-400 mt-2 line-clamp-3 leading-relaxed" x-text="task.desc">
+                                </p>
+
+                                <div class="mt-4 pt-4 border-t border-slate-700/50 flex flex-col gap-3">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-400/50 text-white flex items-center justify-center font-bold text-[10px] shadow-sm"
+                                                x-text="task.assigneeInitials"></div>
+                                            <span class="font-medium text-slate-300" x-text="task.assignee"></span>
+                                        </div>
+                                        <div
+                                            class="flex items-center gap-1.5 text-red-400 font-mono font-medium bg-red-500/5 px-2 py-1 rounded">
+                                            <i data-lucide="calendar-x" class="w-3.5 h-3.5"></i>
+                                            <span x-text="task.dueDate"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Move Task Actions -->
+                                    <div class="flex gap-2 w-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="moveTask(task.id, 'delayed')"
+                                            class="flex-1 text-[10px] font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 py-1.5 rounded border border-amber-500/20 transition-colors">Move
+                                            to Delayed</button>
+                                        <button @click="moveTask(task.id, 'done')"
+                                            class="flex-1 text-[10px] font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 py-1.5 rounded border border-emerald-500/20 transition-colors">Mark
+                                            Done</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="filteredTasks('critical').length === 0"
+                            class="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 opacity-60">
+                            <i data-lucide="check-circle" class="w-10 h-10"></i>
+                            <p class="text-xs font-semibold">No critical tasks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column: Delayed -->
+                <div
+                    class="glass-card rounded-3xl flex flex-col border-t-4 border-t-amber-500 shadow-[0_8px_30px_rgba(245,158,11,0.05)] h-[600px] flex flex-col">
+                    <div
+                        class="p-5 border-b border-slate-800/50 bg-slate-900/20 flex items-center justify-between rounded-t-3xl">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                                <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                            </div>
+                            <h4 class="font-extrabold text-sm text-slate-100">Delayed / In Progress</h4>
+                        </div>
+                        <span
+                            class="text-xs font-mono font-bold bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-sm"
+                            x-text="filteredTasks('delayed').length">0</span>
+                    </div>
+
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1 hide-scrollbar">
+                        <template x-for="task in filteredTasks('delayed')" :key="task.id">
+                            <div
+                                class="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-5 hover:border-amber-500/50 transition-all duration-300 shadow-md hover:shadow-[0_10px_25px_rgba(245,158,11,0.1)] group relative overflow-hidden task-card-enter">
+                                <!-- Actions Overlay -->
+                                <div
+                                    class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="editTask(task)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-md border border-slate-700 hover:border-indigo-500 transition-colors"
+                                        title="Edit">
+                                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                    <button @click="deleteTask(task.id)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-red-400 rounded-md border border-slate-700 hover:border-red-500 transition-colors"
+                                        title="Delete">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                    <span
+                                        class="text-[10px] font-bold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase tracking-wide"
+                                        x-text="task.category"></span>
+                                    <span
+                                        class="text-[10px] text-slate-500 font-mono font-medium bg-slate-800/50 px-2 py-0.5 rounded"
+                                        x-text="task.id"></span>
+                                </div>
+                                <h5 class="text-sm font-bold text-slate-100 group-hover:text-indigo-300 transition-colors pr-10"
+                                    x-text="task.title"></h5>
+                                <p class="text-xs text-slate-400 mt-2 line-clamp-3 leading-relaxed" x-text="task.desc">
+                                </p>
+
+                                <div class="mt-4 pt-4 border-t border-slate-700/50 flex flex-col gap-3">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 border border-emerald-400/50 text-white flex items-center justify-center font-bold text-[10px] shadow-sm"
+                                                x-text="task.assigneeInitials"></div>
+                                            <span class="font-medium text-slate-300" x-text="task.assignee"></span>
+                                        </div>
+                                        <div
+                                            class="flex items-center gap-1.5 text-amber-400 font-mono font-medium bg-amber-500/5 px-2 py-1 rounded">
+                                            <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+                                            <span x-text="task.dueDate"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Move Task Actions -->
+                                    <div class="flex gap-2 w-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="moveTask(task.id, 'critical')"
+                                            class="flex-1 text-[10px] font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20 py-1.5 rounded border border-red-500/20 transition-colors">To
+                                            Critical</button>
+                                        <button @click="moveTask(task.id, 'done')"
+                                            class="flex-1 text-[10px] font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 py-1.5 rounded border border-emerald-500/20 transition-colors">Mark
+                                            Done</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="filteredTasks('delayed').length === 0"
+                            class="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 opacity-60">
+                            <i data-lucide="check-circle" class="w-10 h-10"></i>
+                            <p class="text-xs font-semibold">No delayed tasks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column: Done -->
+                <div
+                    class="glass-card rounded-3xl flex flex-col border-t-4 border-t-emerald-500 shadow-[0_8px_30px_rgba(16,185,129,0.05)] h-[600px] flex flex-col">
+                    <div
+                        class="p-5 border-b border-slate-800/50 bg-slate-900/20 flex items-center justify-between rounded-t-3xl">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                            </div>
+                            <h4 class="font-extrabold text-sm text-slate-100">Done / Verified</h4>
+                        </div>
+                        <span
+                            class="text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20 shadow-sm"
+                            x-text="filteredTasks('done').length">0</span>
+                    </div>
+
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1 hide-scrollbar">
+                        <template x-for="task in filteredTasks('done')" :key="task.id">
+                            <div
+                                class="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-5 hover:border-emerald-500/30 transition-all duration-300 shadow-sm opacity-75 hover:opacity-100 group relative overflow-hidden task-card-enter">
+                                <!-- Actions Overlay -->
+                                <div
+                                    class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="editTask(task)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-white rounded-md border border-slate-700 hover:border-indigo-500 transition-colors"
+                                        title="Edit">
+                                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                    <button @click="deleteTask(task.id)"
+                                        class="p-1.5 bg-slate-800 text-slate-300 hover:text-red-400 rounded-md border border-slate-700 hover:border-red-500 transition-colors"
+                                        title="Delete">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                    <span
+                                        class="text-[10px] font-bold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-wide"
+                                        x-text="task.category"></span>
+                                    <span
+                                        class="text-[10px] text-slate-500 font-mono font-medium bg-slate-800/30 px-2 py-0.5 rounded"
+                                        x-text="task.id"></span>
+                                </div>
+                                <h5 class="text-sm font-bold text-slate-300 line-through decoration-slate-500 group-hover:text-slate-200 group-hover:no-underline transition-all pr-10"
+                                    x-text="task.title"></h5>
+                                <p class="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed" x-text="task.desc">
+                                </p>
+
+                                <div class="mt-4 pt-4 border-t border-slate-800/50 flex flex-col gap-3">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-full bg-slate-700 border border-slate-600 text-slate-300 flex items-center justify-center font-bold text-[10px]"
+                                                x-text="task.assigneeInitials"></div>
+                                            <span class="font-medium text-slate-400" x-text="task.assignee"></span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 text-emerald-500 font-mono font-medium">
+                                            <i data-lucide="check-check" class="w-4 h-4"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Move Task Actions -->
+                                    <div class="flex gap-2 w-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="moveTask(task.id, 'delayed')"
+                                            class="flex-1 text-[10px] font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 py-1.5 rounded border border-amber-500/20 transition-colors">To
+                                            Delayed</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="filteredTasks('done').length === 0"
+                            class="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 opacity-60">
+                            <i data-lucide="circle-dashed" class="w-10 h-10"></i>
+                            <p class="text-xs font-semibold">No completed tasks</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Dynamic Modal for Creating/Editing Task -->
+        <div x-show="isNewTaskModalOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+            x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-cloak>
+            <div @click.away="isNewTaskModalOpen = false"
+                class="glass-card w-full max-w-lg p-7 rounded-3xl border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)] space-y-5"
+                x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 translate-y-8 scale-95">
+
+                <div class="flex items-center justify-between border-b border-slate-700/50 pb-4">
+                    <h3 class="font-extrabold text-lg text-white flex items-center gap-2">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5 text-indigo-400"></i>
+                        <span x-text="isEditing ? 'Edit Milestone' : 'Create New Milestone'"></span>
+                    </h3>
+                    <button @click="isNewTaskModalOpen = false"
+                        class="text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 p-2 rounded-xl transition-colors">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <form @submit.prevent="saveTask()" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Task Title <span
+                                class="text-red-400">*</span></label>
+                        <input type="text" x-model="newTask.title" required
+                            placeholder="e.g. Fix Foreign Key Constraints"
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1.5">Category</label>
+                            <input type="text" x-model="newTask.category" required placeholder="DBMS / Docs"
+                                class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1.5">Current Status</label>
+                            <select x-model="newTask.status"
+                                class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner appearance-none cursor-pointer">
+                                <option value="critical">Critical / Blocked</option>
+                                <option value="delayed">Delayed / In Progress</option>
+                                <option value="done">Done / Verified</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Assignee</label>
+                        <input type="text" x-model="newTask.assignee" placeholder="e.g. Ravi Kumawat"
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Description details</label>
+                        <textarea x-model="newTask.desc" rows="3" placeholder="Describe critical resolution steps..."
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner resize-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-700/50 mt-6">
+                        <button type="button" @click="isNewTaskModalOpen = false"
+                            class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold rounded-xl transition-colors">Cancel</button>
+                        <button type="submit"
+                            class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all active:scale-95 flex items-center gap-2">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            <span x-text="isEditing ? 'Save Changes' : 'Create Task'"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="border-t border-slate-800/60 bg-slate-950/80 backdrop-blur-md py-6 mt-12 animate-fade-in">
+        <div
+            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+            <div class="flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4 text-slate-600"></i>
+                <p class="font-medium">GroupSync Engine v2.0 • Advanced Project Recovery System</p>
+            </div>
+            <div class="flex items-center gap-4 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800">
+                <span class="flex items-center gap-1.5"><span
+                        class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <strong
+                        class="text-emerald-400 font-semibold">Systems Operational</strong></span>
+                <span class="text-slate-700">•</span>
+                <span class="font-medium">Team: Group-09</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Alpine.js Application Script -->
+    <script>
+        // Default seed data
+        const defaultTasks = [
+            { id: 'DBMS-101', title: 'Normalize Database Schemas to 3NF', category: 'DBMS Core', desc: 'Eliminate repeating groups and functional dependencies in payment transactions.', status: 'critical', assignee: 'Priya S.', assigneeInitials: 'PS', dueDate: 'Overdue' },
+            { id: 'DBMS-102', title: 'Re-sync Stored Procedure Triggers', category: 'SQL Scripts', desc: 'Audit logs failing on customer deletion due to unhandled NULL key constraint.', status: 'critical', assignee: 'Ravi K.', assigneeInitials: 'RK', dueDate: 'Overdue' },
+            { id: 'DBMS-103', title: 'Update SQL Query Optimization Reports', category: 'Documentation', desc: 'Include EXPLAIN query plan diagrams for professor review.', status: 'delayed', assignee: 'Ravi K.', assigneeInitials: 'RK', dueDate: 'In 2 hrs' },
+            { id: 'DBMS-104', title: 'Backend API Endpoint Testing', category: 'Integration', desc: 'Verify response latency under 200ms for heavy join queries.', status: 'delayed', assignee: 'Amit K.', assigneeInitials: 'AK', dueDate: 'In 4 hrs' },
+            { id: 'DBMS-098', title: 'Generate Relational ER-Diagram (PDF)', category: 'Architecture', desc: 'Crowfoot notation ERD exported and cross-verified with SQL schema.', status: 'done', assignee: 'Amit K.', assigneeInitials: 'AK', dueDate: 'Done' },
+            { id: 'DBMS-099', title: 'Setup PostgreSQL Cloud Instance', category: 'Infrastructure', desc: 'Hosted on Supabase with SSL encrypted connections enabled.', status: 'done', assignee: 'Priya S.', assigneeInitials: 'PS', dueDate: 'Done' }
+        ];
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dashboardApp', () => ({
+                showAlertBanner: true,
+                isNewTaskModalOpen: false,
+                mobileMenuOpen: false,
+                countdown: '04h 18m 32s',
+                filter: 'all',
+                searchQuery: '',
+                isEditing: false,
+
+                newTask: { id: null, title: '', category: 'DBMS Core', status: 'critical', assignee: 'Ravi K.', desc: '' },
+                tasks: [],
+
+                init() {
+                    // Load tasks from Local Storage or set defaults
+                    const savedTasks = localStorage.getItem('groupSyncTasks_v2');
+                    if (savedTasks) {
+                        try {
+                            this.tasks = JSON.parse(savedTasks);
+                        } catch (e) {
+                            this.tasks = [...defaultTasks];
+                        }
+                    } else {
+                        this.tasks = [...defaultTasks];
+                        this.saveTasks();
+                    }
+
+                    // Countdown simulator
+                    let seconds = 4 * 3600 + 18 * 60 + 32;
+                    setInterval(() => {
+                        if (seconds > 0) seconds--;
+                        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+                        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+                        const s = (seconds % 60).toString().padStart(2, '0');
+                        this.countdown = `${h}h ${m}m ${s}s`;
+                    }, 1000);
+                },
+
+                saveTasks() {
+                    localStorage.setItem('groupSyncTasks_v2', JSON.stringify(this.tasks));
+                },
+
+                filteredTasks(statusColumn) {
+                    return this.tasks.filter(t => {
+                        const matchesStatus = t.status === statusColumn;
+                        if (!matchesStatus) return false;
+
+                        // Filter by pill
+                        let matchesFilter = true;
+                        if (this.filter === 'critical') {
+                            matchesFilter = t.status === 'critical';
+                        } else if (this.filter === 'mine') {
+                            matchesFilter = t.assignee.toLowerCase().includes('ravi');
+                        }
+
+                        // Filter by search bar
+                        let matchesSearch = true;
+                        if (this.searchQuery.trim() !== '') {
+                            const query = this.searchQuery.toLowerCase();
+                            matchesSearch = t.title.toLowerCase().includes(query) ||
+                                t.assignee.toLowerCase().includes(query) ||
+                                t.id.toLowerCase().includes(query) ||
+                                t.category.toLowerCase().includes(query);
+                        }
+
+                        return matchesFilter && matchesSearch;
+                    });
+                },
+
+                openNewTaskModal() {
+                    this.isEditing = false;
+                    this.newTask = { id: null, title: '', category: 'DBMS Core', status: 'critical', assignee: 'Ravi K.', desc: '' };
+                    this.isNewTaskModalOpen = true;
+                    // Re-init icons when modal opens
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+
+                editTask(task) {
+                    this.isEditing = true;
+                    this.newTask = JSON.parse(JSON.stringify(task)); // Deep copy
+                    this.isNewTaskModalOpen = true;
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+
+                saveTask() {
+                    if (!this.newTask.title) return;
+
+                    const initials = this.newTask.assignee
+                        .split(' ')
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase() || 'UN';
+
+                    if (this.isEditing) {
+                        // Update existing
+                        const index = this.tasks.findIndex(t => t.id === this.newTask.id);
+                        if (index !== -1) {
+                            this.tasks[index] = { ...this.newTask, assigneeInitials: initials };
+                        }
+                    } else {
+                        // Create new
+                        this.tasks.unshift({
+                            ...this.newTask,
+                            id: 'DBMS-' + Math.floor(100 + Math.random() * 900),
+                            assigneeInitials: initials,
+                            dueDate: 'Just now'
+                        });
+                    }
+
+                    this.saveTasks();
+                    this.isNewTaskModalOpen = false;
+
+                    // Re-render icons
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                deleteTask(id) {
+                    if (confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+                        this.tasks = this.tasks.filter(t => t.id !== id);
+                        this.saveTasks();
+                    }
+                },
+
+                moveTask(id, newStatus) {
+                    const task = this.tasks.find(t => t.id === id);
+                    if (task) {
+                        task.status = newStatus;
+                        this.saveTasks();
+                        // Small delay to allow alpine render before refreshing icons
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                }
+            }));
+        });
+    </script>
+    <script>
+        // Initialize Lucide Icons
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+
+</html>
